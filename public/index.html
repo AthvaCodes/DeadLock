@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Deadlock — The 1-Thumb Group Indecision Killer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="thumb-right-handed">
+
+  <!-- Ergonomic Thumb Zone Overlay (Diagnostic Visualizer) -->
+  <div id="thumbErgoOverlay" class="thumb-overlay hidden">
+    <div class="zone-label zone-stretch">⚠️ Stretch Zone (No Controls Allowed)</div>
+    <div class="zone-label zone-natural">👍 Natural 1-Thumb Reach Zone</div>
+  </div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confettiCanvas"></canvas>
+
+  <div class="app-layout">
+
+    <!-- DESKTOP TOP BAR (Only visible on wide screens) -->
+    <header class="desktop-banner">
+      <div class="banner-left">
+        <span class="logo-emoji">⚡</span>
+        <div>
+          <h1 class="logo-title">DEADLOCK</h1>
+          <p class="logo-subtitle">Group Indecision Killer • Built for 1-Thumb Reach</p>
+        </div>
+      </div>
+      <div class="banner-center">
+        <div class="constraint-badge">
+          <span class="badge-icon">👍</span>
+          <span>Constraint #1: 100% 1-Thumb Usable</span>
+        </div>
+      </div>
+      <div class="banner-right">
+        <button id="desktopThemeBtn" class="pill-btn secondary">🌙 Theme</button>
+      </div>
+    </header>
+
+    <main class="main-container">
+
+      <!-- ==============================================
+           SCREEN 1: WELCOME & ROOM CREATION / JOIN
+           (Optimized for single-thumb onboarding)
+      ============================================== -->
+      <section id="screenOnboarding" class="app-screen active">
+        <div class="screen-view-zone">
+          <div class="hero-header">
+            <div class="hero-pill">⚡ 45-MIN DEBATES END IN 15 SECONDS</div>
+            <h2 class="hero-headline">Stop asking <br><span class="highlight">"Kahan chalein?"</span></h2>
+            <p class="hero-desc">
+              Tinder-swipe consensus for friends, flatmates & teams. 
+              Swipe with one thumb, break the deadlock, go eat.
+            </p>
+          </div>
+
+          <div class="category-cards-preview">
+            <div class="cat-pill active">🍕 Food & Cafes</div>
+            <div class="cat-pill">☕ Chai & Tapri</div>
+            <div class="cat-pill">🚗 Late Night Drives</div>
+            <div class="cat-pill">🍿 Watch Party</div>
+          </div>
+        </div>
+
+        <!-- 1-Thumb Ergonomic Action Deck -->
+        <div class="screen-thumb-zone">
+          <div class="thumb-card-box">
+            
+            <!-- Quick Name & Avatar Bar (Accessible with thumb) -->
+            <div class="name-entry-cluster">
+              <div class="avatar-carousel" id="avatarCarousel">
+                <button type="button" class="avatar-chip active" data-avatar="😎">😎</button>
+                <button type="button" class="avatar-chip" data-avatar="🍕">🍕</button>
+                <button type="button" class="avatar-chip" data-avatar="☕">☕</button>
+                <button type="button" class="avatar-chip" data-avatar="🚗">🚗</button>
+                <button type="button" class="avatar-chip" data-avatar="🔥">🔥</button>
+                <button type="button" class="avatar-chip" data-avatar="🥗">🥗</button>
+              </div>
+              <input type="text" id="userNameInput" placeholder="Your name (e.g. Rohan)" maxlength="16" autocomplete="off" class="thumb-input">
+            </div>
+
+            <!-- Segmented Action Switch: Create vs Join (Thumb tap) -->
+            <div class="thumb-tabs">
+              <button id="tabCreateRoom" class="thumb-tab active">Create New Circle</button>
+              <button id="tabJoinRoom" class="thumb-tab">Join with Code</button>
+            </div>
+
+            <!-- Tab 1: Create Deck Form -->
+            <div id="createTabContent" class="tab-pane active">
+              <div class="thumb-chips-grid" id="categoryChips">
+                <button class="thumb-chip active" data-cat="food">🍕 Food & Bites</button>
+                <button class="thumb-chip" data-cat="cafe">☕ Cafes & Chai</button>
+                <button class="thumb-chip" data-cat="nightout">🚗 Night Out</button>
+                <button class="thumb-chip" data-cat="movies">🍿 Watch Party</button>
+              </div>
+              <button id="btnCreateRoom" class="thumb-btn primary">
+                <span class="btn-text">Launch Circle ⚡</span>
+                <span class="btn-subtext">Invite friends & break deadlock</span>
+              </button>
+            </div>
+
+            <!-- Tab 2: Join Form -->
+            <div id="joinTabContent" class="tab-pane">
+              <div class="code-input-row">
+                <input type="text" id="roomCodeInput" placeholder="ROOM CODE (e.g. HUNGRY-42)" class="thumb-input code-input" maxlength="14" uppercase>
+              </div>
+              <button id="btnJoinRoom" class="thumb-btn primary">
+                <span class="btn-text">Hop In Circle 🚀</span>
+                <span class="btn-subtext">Join your group's live swipe deck</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SCREEN 2: ACTIVE SWIPE LOBBY
+           (The Heart: 100% 1-Thumb Reachable Deck)
+      ============================================== -->
+      <section id="screenVoting" class="app-screen">
+
+        <!-- Top Viewing Area: Zero Thumb-Stretch Required -->
+        <div class="screen-view-zone voting-view">
+          
+          <!-- Room Status Ribbon -->
+          <div class="voting-top-ribbon">
+            <div class="room-code-tag" id="btnCopyCode" title="Tap to copy invite link">
+              <span class="pulse-dot"></span>
+              <span id="displayRoomCode">CODE</span>
+              <span class="copy-hint">📋</span>
+            </div>
+            
+            <div class="participant-avatars" id="participantAvatars">
+              <!-- Live avatar bubbles rendered dynamically -->
+            </div>
+
+            <button id="btnToggleDetails" class="pill-btn mini" title="Scoreboard">
+              📊 Live Scores
+            </button>
+          </div>
+
+          <!-- Consensus Meter -->
+          <div class="consensus-meter-container">
+            <div class="meter-meta">
+              <span id="consensusLabel">Consensus: Searching common ground...</span>
+              <span id="cardsLeftLabel">3 left</span>
+            </div>
+            <div class="meter-track">
+              <div id="consensusFill" class="meter-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- THE TACTILE CARD DECK -->
+          <div class="card-deck-viewport">
+            <div id="cardDeckContainer" class="card-stack">
+              <!-- Cards rendered dynamically via app.js -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- BOTTOM NATURAL THUMB ZONE (The 40% Action Arc) -->
+        <div class="screen-thumb-zone voting-thumb-deck">
+          
+          <!-- Tactile 1-Thumb Control Arc -->
+          <div class="thumb-arc-container">
+
+            <!-- Swipe Action Buttons (Oversized, min 64px tap height) -->
+            <div class="thumb-action-buttons">
+              <button id="btnVeto" class="thumb-action-btn veto" title="Hard Veto (No way)">
+                <span class="action-icon">🚫</span>
+                <span class="action-label">Veto</span>
+                <span class="action-hotkey">[A / ←]</span>
+              </button>
+
+              <button id="btnMeh" class="thumb-action-btn meh" title="Meh / If others want">
+                <span class="action-icon">🤷</span>
+                <span class="action-label">Meh</span>
+                <span class="action-hotkey">[W / ↑]</span>
+              </button>
+
+              <button id="btnYes" class="thumb-action-btn yes" title="Hell Yes! Down!">
+                <span class="action-icon">👍</span>
+                <span class="action-label">I'm Down!</span>
+                <span class="action-hotkey">[D / →]</span>
+              </button>
+            </div>
+
+            <!-- Ergonomic Quick Utility Bar (1-Thumb Reachable) -->
+            <div class="thumb-utility-dock">
+              <!-- Left/Right Handed Thumb Toggle -->
+              <button id="btnHandToggle" class="utility-pill" title="Toggle Left/Right Thumb mode">
+                <span id="handIcon">👉</span>
+                <span id="handText">Right Thumb</span>
+              </button>
+
+              <!-- Thumb Zone Diagnostic Overlay Toggle -->
+              <button id="btnOverlayToggle" class="utility-pill" title="Show Thumb Reach Zone Overlay">
+                <span>📐 Zone Check</span>
+              </button>
+
+              <!-- Sound Toggle -->
+              <button id="btnSoundToggle" class="utility-pill" title="Sound feedback">
+                <span id="soundIcon">🔊</span>
+              </button>
+
+              <!-- Force Resolve (If someone fell asleep) -->
+              <button id="btnForceResolve" class="utility-pill warning" title="Lock in top choice now">
+                <span>⚡ Reveal Winner</span>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- SLIDE-UP THUMB DRAWER: LIVE SCOREBOARD & VETO ALARMS -->
+        <div id="bottomDrawer" class="thumb-drawer">
+          <div class="drawer-handle" id="drawerHandle"></div>
+          <div class="drawer-header">
+            <h3>📊 Live Group Consensus</h3>
+            <button id="btnCloseDrawer" class="pill-btn mini">Done</button>
+          </div>
+          <div class="drawer-body">
+            <div id="scoreboardList" class="scoreboard-items">
+              <!-- Dynamic live scores -->
+            </div>
+            
+            <div class="activity-feed-section">
+              <h4>Activity Stream</h4>
+              <ul id="activityFeedList" class="activity-list">
+                <!-- Live actions -->
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ==============================================
+           SCREEN 3: THE WINNER (DEADLOCK BROKEN!)
+      ============================================== -->
+      <section id="screenWinner" class="app-screen">
+        <div class="screen-view-zone winner-view">
+          
+          <div class="winner-badge">
+            <span class="celebrate-emoji">🎉</span>
+            <span class="badge-text">DEADLOCK CRUSHED!</span>
+          </div>
+
+          <div class="winner-hero-card" id="winnerCard">
+            <div class="winner-icon" id="winnerIcon">🍕</div>
+            <h2 class="winner-title" id="winnerTitle">Thin Crust Pizza</h2>
+            <div class="winner-tags" id="winnerTags">
+              <span class="tag-pill" id="winnerTag">Italian</span>
+              <span class="tag-pill" id="winnerBudget">₹₹</span>
+            </div>
+            <p class="winner-desc" id="winnerDesc">Loaded cheese, jalapeños & garlic dip</p>
+            <div class="winner-quote" id="winnerQuote">
+              "No more 45-minute debates. Everyone agreed, pack up and move!"
+            </div>
+          </div>
+
+          <div class="consensus-stat-box" id="winnerStats">
+            <!-- Stats -->
+          </div>
+
+        </div>
+
+        <!-- 1-Thumb Reachable Bottom Action Deck -->
+        <div class="screen-thumb-zone">
+          <div class="thumb-card-box">
+            <a id="btnNavigateWinner" href="#" target="_blank" class="thumb-btn primary">
+              <span class="btn-text">📍 Find on Google Maps / Zomato</span>
+              <span class="btn-subtext">Open directions & menu immediately</span>
+            </a>
+
+            <div class="winner-secondary-grid">
+              <button id="btnShareWinner" class="thumb-btn secondary">
+                <span>💬 Send to WhatsApp Group</span>
+              </button>
+              <button id="btnPlayAgain" class="thumb-btn outline">
+                <span>🔄 Another Round</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- DESKTOP / LAPTOP COMMAND SIDEBAR (Only visible on wide screen displays) -->
+    <aside class="desktop-command-panel">
+      <div class="desktop-panel-card">
+        <div class="panel-header">
+          <span class="panel-icon">💻</span>
+          <div>
+            <h3>Living Room / Common Screen Mode</h3>
+            <p class="text-muted">Display this on the table or TV while everyone swipes on their phones</p>
+          </div>
+        </div>
+
+        <div class="desktop-qr-container">
+          <div class="qr-placeholder" id="desktopQrBox">
+            <div class="qr-icon">📱</div>
+            <div class="qr-text">Scan or Share Code:</div>
+            <div class="qr-code-highlight" id="desktopCodeDisplay">HUNGRY-00</div>
+          </div>
+          <div class="invite-link-box">
+            <input type="text" id="desktopShareLink" readonly class="link-input">
+            <button id="btnDesktopCopy" class="pill-btn">Copy</button>
+          </div>
+        </div>
+
+        <div class="desktop-consensus-breakdown">
+          <h4>Consensus Matrix</h4>
+          <div id="desktopScoreboard" class="desktop-scoreboard">
+            <!-- Real time ranked list -->
+          </div>
+        </div>
+
+        <div class="desktop-rules-reminder">
+          <h4>💡 How the 1-Thumb Algorithm Works</h4>
+          <ul>
+            <li><strong>👍 I'm Down (+2 pts):</strong> Enthusiastic approval.</li>
+            <li><strong>🤷 Meh (+0.5 pt):</strong> Ok if everyone else wants.</li>
+            <li><strong>🚫 Veto (-3 pts):</strong> Immediate mood-killer flag. Options with zero vetos always win first!</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toastNotification" class="toast hidden">
+    <span id="toastMessage">Alert</span>
+  </div>
+
+  <script src="sounds.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
