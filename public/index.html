@@ -94,7 +94,7 @@
 
               <div class="login-inputs-row">
                 <input type="text" id="userNameInput" placeholder="Username (e.g. Rohan)" maxlength="16" autocomplete="off" class="thumb-input user-input">
-                <input type="password" id="userPinInput" placeholder="4-digit PIN" maxlength="6" inputmode="numeric" class="thumb-input pin-input" value="1234">
+                <input type="password" id="userPinInput" placeholder="4 to 6 digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]{4,6}" autocomplete="current-password" class="thumb-input pin-input">
               </div>
             </div>
 
@@ -144,23 +144,15 @@
           
           <!-- Room Status Ribbon -->
           <div class="voting-top-ribbon">
-            <div class="room-code-tag" id="btnCopyCode" title="Tap to copy invite link">
+            <div class="room-code-tag">
               <span class="pulse-dot"></span>
               <span id="displayRoomCode">CODE</span>
-              <span class="copy-hint">📋</span>
             </div>
             
             <div class="participant-avatars" id="participantAvatars">
               <!-- Live avatar bubbles rendered dynamically -->
             </div>
 
-            <button id="btnOpenAddChoiceTop" class="pill-btn mini primary-tint" title="Add Choice">
-              ➕ Add Choice
-            </button>
-
-            <button id="btnToggleDetails" class="pill-btn mini" title="Scoreboard">
-              📊 Scores
-            </button>
           </div>
 
           <!-- Consensus Meter -->
@@ -212,6 +204,18 @@
 
             <!-- Ergonomic Quick Utility Bar (1-Thumb Reachable) -->
             <div class="thumb-utility-dock">
+              <button id="btnBackToHome" class="utility-pill" title="Leave and go back home">
+                <span>← Leave</span>
+              </button>
+
+              <button id="btnCopyCode" class="utility-pill" title="Copy invite link">
+                <span>📋 Copy Link</span>
+              </button>
+
+              <button id="btnToggleDetails" class="utility-pill" title="Open scores">
+                <span>📊 Scores</span>
+              </button>
+
               <!-- User Input: Add custom decision -->
               <button id="btnOpenAddChoice" class="utility-pill highlight" title="Add your custom decision">
                 <span>➕ Add Choice</span>

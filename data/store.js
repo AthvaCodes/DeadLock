@@ -1,7 +1,21 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 
 const DB_FILE = path.join(__dirname, 'db.json');
+const STATE_TABLE = 'deadlock_state';
+const STATE_ID = 'main';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+
+if (Boolean(supabaseUrl) !== Boolean(supabaseSecretKey)) {
+  throw new Error('Set both SUPABASE_URL and SUPABASE_SECRET_KEY, or leave both unset for local JSON storage.');
+}
+
+if (process.env.NODE_ENV === 'production' && !supabaseUrl) {
+  throw new Error('Production requires SUPABASE_URL and SUPABASE_SECRET_KEY.');
+}
 
 // Built-in presets designed for Indian college & young adult friend circles
 const DEFAULT_PRESETS = {
@@ -36,22 +50,53 @@ const DEFAULT_PRESETS = {
 class DataStore {
   constructor() {
     this.rooms = new Map();
-    this.users = new Map(); // username.toLowerCase() -> { id, username, pin, avatar, createdAt }
+    this.users = new Map(); // username.toLowerCase() -> { id, username, pinHash, avatar, createdAt }
     this.listeners = new Map(); // roomId -> Set of res objects (SSE)
-    this.load();
+    this.supabase = supabaseUrl
+      ? createClient(supabaseUrl, supabaseSecretKey, {
+          auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
+        })
+      : null;
+    this.saveQueue = Promise.resolve();
+    this.ready = this.load();
   }
 
-  load() {
+  hydrate(data = {}) {
+    this.rooms = new Map(Object.entries(data.rooms || {}));
+    this.users = new Map(Object.entries(data.users || {}));
+  }
+
+  snapshot() {
+    return {
+      users: Object.fromEntries(this.users),
+      rooms: Object.fromEntries(this.rooms)
+    };
+  }
+
+  async load() {
+    if (this.supabase) {
+      const { data, error } = await this.supabase
+        .from(STATE_TABLE)
+        .select('state')
+        .eq('id', STATE_ID)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Could not load Supabase state. Run data/supabase-schema.sql first. ${error.message}`);
+      }
+
+      if (data?.state) {
+        this.hydrate(data.state);
+      } else {
+        await this.persistSnapshot(this.snapshot());
+      }
+      return;
+    }
+
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf8');
-        const data = JSON.parse(raw);
-        for (const [id, room] of Object.entries(data.rooms || {})) {
-          this.rooms.set(id, room);
-        }
-        for (const [uname, user] of Object.entries(data.users || {})) {
-          this.users.set(uname, user);
-        }
+        this.hydrate(JSON.parse(raw));
       } else {
         this.save();
       }
@@ -62,52 +107,92 @@ class DataStore {
     }
   }
 
+  async persistSnapshot(state) {
+    const { error } = await this.supabase
+      .from(STATE_TABLE)
+      .upsert({ id: STATE_ID, state, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) throw new Error(`Could not save Supabase state: ${error.message}`);
+  }
+
   save() {
+    const state = this.snapshot();
+    if (this.supabase) {
+      this.saveQueue = this.saveQueue
+        .catch(() => {})
+        .then(() => this.persistSnapshot(state));
+      return this.saveQueue;
+    }
+
     try {
-      const data = {
-        savedAt: new Date().toISOString(),
-        users: Object.fromEntries(this.users),
-        rooms: Object.fromEntries(this.rooms)
-      };
-      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+      fs.writeFileSync(DB_FILE, JSON.stringify({ savedAt: new Date().toISOString(), ...state }, null, 2), 'utf8');
     } catch (err) {
       console.error('Failed to save to db.json:', err.message);
+      throw err;
     }
+    return Promise.resolve();
+  }
+
+  flush() {
+    return this.saveQueue;
+  }
+
+  hashPin(pin, salt = crypto.randomBytes(16).toString('hex')) {
+    const hash = crypto.scryptSync(pin, salt, 64).toString('hex');
+    return `scrypt$${salt}$${hash}`;
+  }
+
+  verifyPin(pin, storedHash) {
+    if (!storedHash?.startsWith('scrypt$')) return storedHash === pin;
+    const [, salt, expectedHex] = storedHash.split('$');
+    const actual = Buffer.from(this.hashPin(pin, salt).split('$')[2], 'hex');
+    const expected = Buffer.from(expectedHex, 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  }
+
+  publicUser(user) {
+    const { pin, pinHash, ...safeUser } = user;
+    return safeUser;
   }
 
   // --- USER AUTHENTICATION / LOGIN ---
-  loginOrRegister({ username, pin = '1234', avatar = '😎' }) {
+  loginOrRegister({ username, pin, avatar = '😎' }) {
     if (!username || !username.trim()) {
       throw new Error('Username is required');
     }
     const cleanUname = username.trim();
     const key = cleanUname.toLowerCase();
-    const cleanPin = (pin || '1234').trim();
+    const cleanPin = String(pin || '').trim();
+    if (!/^\d{4,6}$/.test(cleanPin)) {
+      throw new Error('PIN must be 4 to 6 digits');
+    }
 
     if (this.users.has(key)) {
       const existing = this.users.get(key);
-      if (existing.pin && existing.pin !== cleanPin) {
+      const storedPin = existing.pinHash || existing.pin;
+      if (storedPin && !this.verifyPin(cleanPin, storedPin)) {
         throw new Error('Incorrect PIN for this username. Please try again.');
       }
+      existing.pinHash = this.hashPin(cleanPin);
+      delete existing.pin;
       if (avatar && avatar !== existing.avatar) {
         existing.avatar = avatar;
-        this.save();
       }
-      return existing;
+      this.save();
+      return this.publicUser(existing);
     }
 
     // Register new user
     const newUser = {
       id: `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       username: cleanUname,
-      pin: cleanPin,
+      pinHash: this.hashPin(cleanPin),
       avatar: avatar || '😎',
       createdAt: Date.now()
     };
 
     this.users.set(key, newUser);
     this.save();
-    return newUser;
+    return this.publicUser(newUser);
   }
 
   getUser(userId) {

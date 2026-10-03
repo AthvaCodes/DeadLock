@@ -11,7 +11,7 @@ Fixing the endless "kahan chalein?" fight when picking food or hangouts.
 - **How it changed what I built:**
   - Put every button, swipe card, and drawer in the bottom 45% of the screen so your thumb never has to stretch to the top.
   - Added a left/right thumb switch that flips the main button so lefties don't struggle.
-  - Locked navigation during swiping so you don't accidentally swipe back to the homepage mid-round.
+  - Added a clear Leave control and made browser Back return to onboarding instead of trapping you in a round.
   - Built a "Zone Check" button that shows the thumb reach zone right on screen.
 
 ### The great part
@@ -32,13 +32,24 @@ Fixing the endless "kahan chalein?" fight when picking food or hangouts.
 
 ### Run it
 ```bash
-git clone https://github.com/AthvaCodes/DeadLock.git
-cd DeadLock
 npm install
 npm start
 ```
 Open `http://localhost:3000`.
 
-Env variables used:
-- `PORT`
+Local runs use `data/db.json` by default. To use Supabase locally, copy `.env.example` to `.env`, then fill in `SUPABASE_URL` and `SUPABASE_SECRET_KEY` after setting up the table below.
+
+### Supabase + Render deployment
+1. Create a Supabase project. In its SQL Editor, run `data/supabase-schema.sql` once.
+2. In Supabase Project Settings → API Keys, copy the project URL and a **Secret key** (`sb_secret_...`). Keep the secret key server-side.
+3. Push this repo to GitHub, then in Render choose **New → Blueprint** and connect this repository. Render reads `render.yaml` and asks for `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.
+4. Deploy, then open your Render URL and check `/api/health`.
+
+The room and user state is stored in one Supabase JSONB row. Keep this service at one Render instance; live SSE updates currently use in-process connections. Free Render services can sleep while idle, so the first visit after inactivity may take longer.
+Existing local data in `data/db.json` is not uploaded automatically; the Supabase database starts empty.
+
+Environment variable names:
+- `PORT` (Render provides this automatically)
 - `NODE_ENV`
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY` (never commit its value)

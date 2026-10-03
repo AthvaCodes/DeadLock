@@ -553,7 +553,7 @@ body {
   font-family: var(--font-mono);
   font-size: 0.82rem;
   font-weight: 700;
-  cursor: pointer;
+  cursor: default;
   color: var(--accent-yellow);
 }
 
@@ -910,13 +910,15 @@ body.thumb-left-handed .thumb-utility-dock {
 /* Utility Dock (1-Thumb accessible pills) */
 .thumb-utility-dock {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 0.4rem;
 }
 
 .utility-pill {
-  flex: 1;
+  flex: 1 1 calc(25% - 0.4rem);
+  min-width: 0;
   height: 38px;
   border-radius: 12px;
   background: var(--bg-tertiary);

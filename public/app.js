@@ -9,6 +9,7 @@ class DeadlockApp {
       user: null,
       consensus: null,
       currentCardIndex: 0,
+      pendingVotes: new Set(),
       handMode: 'right', // 'right' or 'left'
       soundEnabled: true,
       overlayVisible: false,
@@ -26,6 +27,7 @@ class DeadlockApp {
       currentY: 0,
       cardEl: null
     };
+    this.voteQueue = Promise.resolve();
 
     this.init();
   }
@@ -61,13 +63,13 @@ class DeadlockApp {
 
     // Voting Elements
     this.displayRoomCode = document.getElementById('displayRoomCode');
+    this.btnBackToHome = document.getElementById('btnBackToHome');
     this.btnCopyCode = document.getElementById('btnCopyCode');
     this.participantAvatars = document.getElementById('participantAvatars');
     this.consensusLabel = document.getElementById('consensusLabel');
     this.cardsLeftLabel = document.getElementById('cardsLeftLabel');
     this.consensusFill = document.getElementById('consensusFill');
     this.cardDeckContainer = document.getElementById('cardDeckContainer');
-    this.btnOpenAddChoiceTop = document.getElementById('btnOpenAddChoiceTop');
 
     // Thumb Deck Buttons
     this.btnVeto = document.getElementById('btnVeto');
@@ -177,7 +179,6 @@ class DeadlockApp {
 
     // Custom Choice Drawer
     this.btnOpenAddChoice.addEventListener('click', () => this.toggleAddChoiceDrawer(true));
-    this.btnOpenAddChoiceTop.addEventListener('click', () => this.toggleAddChoiceDrawer(true));
     this.btnCloseAddChoice.addEventListener('click', () => this.toggleAddChoiceDrawer(false));
     this.drawerAddHandle.addEventListener('click', () => this.toggleAddChoiceDrawer(false));
     this.btnSubmitCustomChoice.addEventListener('click', () => this.handleSubmitCustomChoice());
@@ -198,6 +199,7 @@ class DeadlockApp {
 
     // Leave Circle (Explicit Exit)
     this.btnLeaveRoom.addEventListener('click', () => this.confirmLeaveRoom());
+    this.btnBackToHome.addEventListener('click', () => this.confirmLeaveRoom());
 
     // Winner Actions
     this.btnShareWinner.addEventListener('click', () => this.shareToWhatsApp());
@@ -232,21 +234,11 @@ class DeadlockApp {
     });
   }
 
-  // --- PREVENT ACCIDENTAL BACK NAVIGATION ONCE SWIPING STARTS ---
+  // --- RETURN TO ONBOARDING WHEN THE USER PRESSES BACK ---
   setupHistoryGuard() {
     window.addEventListener('popstate', (e) => {
-      if (this.state.screen === 'voting') {
-        // Prevent going back to homepage
-        window.history.pushState({ locked: true }, '');
-        this.showToast('🔒 Voting active! Finish swiping or use "Leave Circle" in Scores.');
-        window.soundFX?.voteNo();
-      }
-    });
-
-    window.addEventListener('beforeunload', (e) => {
-      if (this.state.screen === 'voting') {
-        e.preventDefault();
-        e.returnValue = 'Voting is currently active. Do you really want to leave?';
+      if (this.state.room && ['voting', 'winner'].includes(this.state.screen)) {
+        this.leaveRoom({ updateHistory: false });
       }
     });
   }
@@ -256,9 +248,11 @@ class DeadlockApp {
       const raw = localStorage.getItem('deadlock_user');
       if (raw) {
         const u = JSON.parse(raw);
+        delete u.pin;
+        delete u.pinHash;
+        localStorage.setItem('deadlock_user', JSON.stringify(u));
         this.state.user = u;
         this.userNameInput.value = u.username;
-        if (u.pin) this.userPinInput.value = u.pin;
         this.state.selectedAvatar = u.avatar || '😎';
 
         this.avatarCarousel.querySelectorAll('.avatar-chip').forEach(chip => {
@@ -367,8 +361,6 @@ class DeadlockApp {
     if (screenName === 'onboarding') this.screenOnboarding.classList.add('active');
     if (screenName === 'voting') {
       this.screenVoting.classList.add('active');
-      // Lock into history stack so back button can't exit accidentally
-      window.history.pushState({ locked: true }, '');
     }
     if (screenName === 'winner') this.screenWinner.classList.add('active');
   }
@@ -376,12 +368,16 @@ class DeadlockApp {
   // --- AUTHENTICATION & LOGIN ---
   async ensureAuthenticated() {
     const username = this.userNameInput.value.trim();
-    const pin = this.userPinInput.value.trim() || '1234';
+    const pin = this.userPinInput.value.trim();
     const avatar = this.state.selectedAvatar || '😎';
 
     if (!username) {
       this.userNameInput.focus();
       throw new Error('Please enter your username');
+    }
+    if (!/^\d{4,6}$/.test(pin)) {
+      this.userPinInput.focus();
+      throw new Error('Enter a 4 to 6 digit PIN');
     }
 
     const res = await fetch('/api/auth/login', {
@@ -582,6 +578,7 @@ class DeadlockApp {
     } else if (payload.type === 'ROOM_RESET') {
       this.state.room = payload.room;
       this.state.currentCardIndex = 0;
+      this.state.pendingVotes.clear();
       this.setupVotingScreen();
       this.switchScreen('voting');
       this.showToast('Circle reset for another round! 🔄');
@@ -628,7 +625,7 @@ class DeadlockApp {
 
     // Filter cards not yet voted by current user
     const userVotes = (this.state.room.votes && this.state.room.votes[this.state.user.id]) || {};
-    const remainingOptions = options.filter(opt => !userVotes[opt.id]);
+    const remainingOptions = options.filter(opt => !userVotes[opt.id] && !this.state.pendingVotes.has(opt.id));
 
     this.cardsLeftLabel.textContent = `${remainingOptions.length} left`;
 
@@ -777,7 +774,15 @@ class DeadlockApp {
   }
 
   animateFlyOut(cardEl, vote) {
+    if (cardEl.dataset.votePending === 'true') return;
+
     const optId = cardEl.dataset.optionId;
+    const roomId = this.state.room?.id;
+    const userId = this.state.user?.id;
+    if (!roomId || !userId) return;
+
+    cardEl.dataset.votePending = 'true';
+    this.state.pendingVotes.add(optId);
 
     if (vote === 'yes') {
       window.soundFX?.voteYes();
@@ -797,9 +802,13 @@ class DeadlockApp {
     }
 
     setTimeout(() => {
-      this.sendVoteToBackend(optId, vote);
+      if (this.state.room?.id !== roomId) return;
       this.renderCards();
-    }, 200);
+      this.voteQueue = this.voteQueue.then(() => {
+        if (this.state.room?.id !== roomId) return;
+        return this.sendVoteToBackend(roomId, userId, optId, vote);
+      });
+    }, 300);
   }
 
   castVoteWithAnimation(vote) {
@@ -811,13 +820,13 @@ class DeadlockApp {
     this.animateFlyOut(topCard, vote);
   }
 
-  async sendVoteToBackend(optionId, vote) {
+  async sendVoteToBackend(roomId, userId, optionId, vote) {
     try {
-      const res = await fetch(`/api/rooms/${this.state.room.id}/vote`, {
+      const res = await fetch(`/api/rooms/${roomId}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: this.state.user.id,
+          userId,
           optionId,
           vote
         })
@@ -826,8 +835,10 @@ class DeadlockApp {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
+      if (this.state.room?.id !== roomId) return;
       this.state.room = data.room;
       this.state.consensus = data.consensus;
+      this.renderCards();
       this.renderConsensusProgress();
       this.renderScoreboards();
 
@@ -836,6 +847,12 @@ class DeadlockApp {
       }
     } catch (err) {
       console.error('Vote failed:', err);
+      if (this.state.room?.id === roomId) this.showToast('Vote did not save. Please try that choice again.');
+    } finally {
+      if (this.state.room?.id === roomId) {
+        this.state.pendingVotes.delete(optionId);
+        this.renderCards();
+      }
     }
   }
 
@@ -931,17 +948,18 @@ class DeadlockApp {
     }
   }
 
-  leaveRoom() {
+  leaveRoom({ updateHistory = true } = {}) {
     if (this.state.sseSource) {
       this.state.sseSource.close();
       this.state.sseSource = null;
     }
     this.state.room = null;
     this.state.consensus = null;
+    this.state.pendingVotes.clear();
     this.toggleDrawer(false);
     this.switchScreen('onboarding');
     // Clear room query param
-    window.history.pushState({}, '', window.location.pathname);
+    if (updateHistory) window.history.replaceState({}, '', window.location.pathname);
     this.showToast('Left circle');
   }
 
