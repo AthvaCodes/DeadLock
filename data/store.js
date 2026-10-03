@@ -36,6 +36,7 @@ const DEFAULT_PRESETS = {
 class DataStore {
   constructor() {
     this.rooms = new Map();
+    this.users = new Map(); // username.toLowerCase() -> { id, username, pin, avatar, createdAt }
     this.listeners = new Map(); // roomId -> Set of res objects (SSE)
     this.load();
   }
@@ -48,12 +49,16 @@ class DataStore {
         for (const [id, room] of Object.entries(data.rooms || {})) {
           this.rooms.set(id, room);
         }
+        for (const [uname, user] of Object.entries(data.users || {})) {
+          this.users.set(uname, user);
+        }
       } else {
         this.save();
       }
     } catch (err) {
       console.warn('Could not read existing db.json, starting fresh:', err.message);
       this.rooms = new Map();
+      this.users = new Map();
     }
   }
 
@@ -61,6 +66,7 @@ class DataStore {
     try {
       const data = {
         savedAt: new Date().toISOString(),
+        users: Object.fromEntries(this.users),
         rooms: Object.fromEntries(this.rooms)
       };
       fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
@@ -69,6 +75,49 @@ class DataStore {
     }
   }
 
+  // --- USER AUTHENTICATION / LOGIN ---
+  loginOrRegister({ username, pin = '1234', avatar = '😎' }) {
+    if (!username || !username.trim()) {
+      throw new Error('Username is required');
+    }
+    const cleanUname = username.trim();
+    const key = cleanUname.toLowerCase();
+    const cleanPin = (pin || '1234').trim();
+
+    if (this.users.has(key)) {
+      const existing = this.users.get(key);
+      if (existing.pin && existing.pin !== cleanPin) {
+        throw new Error('Incorrect PIN for this username. Please try again.');
+      }
+      if (avatar && avatar !== existing.avatar) {
+        existing.avatar = avatar;
+        this.save();
+      }
+      return existing;
+    }
+
+    // Register new user
+    const newUser = {
+      id: `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      username: cleanUname,
+      pin: cleanPin,
+      avatar: avatar || '😎',
+      createdAt: Date.now()
+    };
+
+    this.users.set(key, newUser);
+    this.save();
+    return newUser;
+  }
+
+  getUser(userId) {
+    for (const u of this.users.values()) {
+      if (u.id === userId) return u;
+    }
+    return null;
+  }
+
+  // --- ROOMS ---
   createRoom({ title, category = 'food', customOptions = null }) {
     const code = this.generateRoomCode();
     const options = (customOptions && customOptions.length > 0)
@@ -88,7 +137,7 @@ class DataStore {
       category,
       status: 'voting', // 'voting' | 'decided'
       createdAt: Date.now(),
-      options,
+      options: [...options],
       participants: [],
       votes: {}, // userId -> { [optionId]: 'yes' | 'no' | 'meh' }
       winner: null,
@@ -107,40 +156,80 @@ class DataStore {
     return this.rooms.get(code.toUpperCase().trim()) || null;
   }
 
-  joinRoom(code, { name, avatar = '😎' }) {
+  joinRoom(code, { userId, name, avatar = '😎' }) {
     const room = this.getRoom(code);
     if (!room) return null;
 
-    const existing = room.participants.find(p => p.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      return { room, user: existing };
+    let userObj = null;
+    if (userId) {
+      userObj = this.getUser(userId);
+    }
+    const finalName = userObj ? userObj.username : (name || 'Friend');
+    const finalAvatar = userObj ? userObj.avatar : (avatar || '😎');
+    const finalId = userObj ? userObj.id : (userId || `user_${Date.now()}`);
+
+    const existingIndex = room.participants.findIndex(p => p.id === finalId || p.name.toLowerCase() === finalName.toLowerCase());
+    
+    let participant;
+    if (existingIndex !== -1) {
+      participant = room.participants[existingIndex];
+      participant.avatar = finalAvatar;
+    } else {
+      const isHost = room.participants.length === 0;
+      participant = {
+        id: finalId,
+        name: finalName,
+        avatar: finalAvatar,
+        isHost,
+        joinedAt: Date.now()
+      };
+      room.participants.push(participant);
+      room.activity.unshift({
+        text: `${finalName} joined the circle`,
+        time: Date.now()
+      });
+      if (room.activity.length > 25) room.activity.pop();
     }
 
-    const userId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const isHost = room.participants.length === 0;
-    const user = {
-      id: userId,
-      name,
-      avatar,
-      isHost,
-      joinedAt: Date.now()
+    this.save();
+    this.broadcast(room.id, { type: 'PARTICIPANT_JOINED', room, user: participant });
+    return { room, user: participant };
+  }
+
+  // --- USER INPUT: ADD DECISIONS ON THE FLY ---
+  addOption(code, { userId, name, desc = '', tag = 'Group Pick', icon = '✨', budget = '₹₹' }) {
+    const room = this.getRoom(code);
+    if (!room) return null;
+
+    if (!name || !name.trim()) {
+      throw new Error('Choice title is required');
+    }
+
+    const participant = room.participants.find(p => p.id === userId);
+    const newOption = {
+      id: `opt_cust_${Date.now()}_${Math.floor(Math.random() * 100)}`,
+      name: name.trim(),
+      desc: desc.trim() || 'Added by a group member',
+      tag: tag.trim() || 'Group Pick',
+      icon: icon || '✨',
+      budget: budget || '₹₹',
+      addedBy: participant ? participant.name : 'A member'
     };
 
-    room.participants.push(user);
+    room.options.push(newOption);
     room.activity.unshift({
-      text: `${name} joined the circle`,
+      text: `${participant ? participant.name : 'Someone'} added "${newOption.name}" to the deck! 🎯`,
       time: Date.now()
     });
+    if (room.activity.length > 25) room.activity.pop();
 
-    if (room.activity.length > 20) room.activity.pop();
-
+    const consensus = this.calculateConsensus(room);
     this.save();
-    this.broadcast(room.id, { type: 'PARTICIPANT_JOINED', room, user });
-    return { room, user };
+    this.broadcast(room.id, { type: 'OPTION_ADDED', room, newOption, consensus });
+    return { room, newOption, consensus };
   }
 
   castVote(code, { userId, optionId, vote }) {
-    // vote is 'yes', 'no' (veto), or 'meh'
     const room = this.getRoom(code);
     if (!room) return null;
 
@@ -158,9 +247,8 @@ class DataStore {
       text: `${participant ? participant.name : 'Someone'} ${voteWord} "${option ? option.name : 'an option'}"`,
       time: Date.now()
     });
-    if (room.activity.length > 20) room.activity.pop();
+    if (room.activity.length > 25) room.activity.pop();
 
-    // Check if consensus is reached or recalculate scores
     const consensus = this.calculateConsensus(room);
     if (consensus.unanimousWinner && room.status !== 'decided') {
       room.status = 'decided';
@@ -198,7 +286,6 @@ class DataStore {
       }
 
       // Consensus Score: Yes = +2, Meh = +0.5, No (Veto) = -3
-      // A single veto severely drops the option, perfectly capturing real group dynamics!
       const score = (yesCount * 2) + (mehCount * 0.5) - (noCount * 3);
       const isVetoed = noCount > 0;
       const isUnanimous = totalUsers >= 2 && yesCount === totalUsers;
@@ -234,13 +321,7 @@ class DataStore {
     const room = this.getRoom(code);
     if (!room) return null;
 
-    const host = room.participants.find(p => p.id === hostUserId);
-    if (!host || !host.isHost) {
-      // allow resolve if anyone is in the room as well for flexibility
-    }
-
     const consensus = this.calculateConsensus(room);
-    // Find best non-vetoed option or top scored
     const best = consensus.scores.find(s => !s.isVetoed) || consensus.scores[0];
     if (best) {
       room.status = 'decided';

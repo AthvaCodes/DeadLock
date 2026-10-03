@@ -38,6 +38,10 @@
         </div>
       </div>
       <div class="banner-right">
+        <div id="desktopUserPill" class="user-pill hidden">
+          <span id="desktopUserAvatar">😎</span>
+          <span id="desktopUserName">User</span>
+        </div>
         <button id="desktopThemeBtn" class="pill-btn secondary">🌙 Theme</button>
       </div>
     </header>
@@ -45,7 +49,7 @@
     <main class="main-container">
 
       <!-- ==============================================
-           SCREEN 1: WELCOME & ROOM CREATION / JOIN
+           SCREEN 1: LOGIN & ONBOARDING / ROOM CREATION
            (Optimized for single-thumb onboarding)
       ============================================== -->
       <section id="screenOnboarding" class="app-screen active">
@@ -55,7 +59,7 @@
             <h2 class="hero-headline">Stop asking <br><span class="highlight">"Kahan chalein?"</span></h2>
             <p class="hero-desc">
               Tinder-swipe consensus for friends, flatmates & teams. 
-              Swipe with one thumb, break the deadlock, go eat.
+              Swipe simultaneously with one thumb, break the deadlock, go eat.
             </p>
           </div>
 
@@ -71,8 +75,13 @@
         <div class="screen-thumb-zone">
           <div class="thumb-card-box">
             
-            <!-- Quick Name & Avatar Bar (Accessible with thumb) -->
+            <!-- User Login / Profile Section -->
             <div class="name-entry-cluster">
+              <div class="auth-header-row">
+                <span class="auth-label">👤 Profile Login</span>
+                <span id="authStatusText" class="auth-hint">Enter your username & PIN</span>
+              </div>
+
               <div class="avatar-carousel" id="avatarCarousel">
                 <button type="button" class="avatar-chip active" data-avatar="😎">😎</button>
                 <button type="button" class="avatar-chip" data-avatar="🍕">🍕</button>
@@ -80,13 +89,18 @@
                 <button type="button" class="avatar-chip" data-avatar="🚗">🚗</button>
                 <button type="button" class="avatar-chip" data-avatar="🔥">🔥</button>
                 <button type="button" class="avatar-chip" data-avatar="🥗">🥗</button>
+                <button type="button" class="avatar-chip" data-avatar="🍦">🍦</button>
               </div>
-              <input type="text" id="userNameInput" placeholder="Your name (e.g. Rohan)" maxlength="16" autocomplete="off" class="thumb-input">
+
+              <div class="login-inputs-row">
+                <input type="text" id="userNameInput" placeholder="Username (e.g. Rohan)" maxlength="16" autocomplete="off" class="thumb-input user-input">
+                <input type="password" id="userPinInput" placeholder="4-digit PIN" maxlength="6" inputmode="numeric" class="thumb-input pin-input" value="1234">
+              </div>
             </div>
 
             <!-- Segmented Action Switch: Create vs Join (Thumb tap) -->
             <div class="thumb-tabs">
-              <button id="tabCreateRoom" class="thumb-tab active">Create New Circle</button>
+              <button id="tabCreateRoom" class="thumb-tab active">Create Circle</button>
               <button id="tabJoinRoom" class="thumb-tab">Join with Code</button>
             </div>
 
@@ -99,19 +113,19 @@
                 <button class="thumb-chip" data-cat="movies">🍿 Watch Party</button>
               </div>
               <button id="btnCreateRoom" class="thumb-btn primary">
-                <span class="btn-text">Launch Circle ⚡</span>
-                <span class="btn-subtext">Invite friends & break deadlock</span>
+                <span class="btn-text">Launch & Invite ⚡</span>
+                <span class="btn-subtext">Start real-time group swipe</span>
               </button>
             </div>
 
             <!-- Tab 2: Join Form -->
             <div id="joinTabContent" class="tab-pane">
               <div class="code-input-row">
-                <input type="text" id="roomCodeInput" placeholder="ROOM CODE (e.g. HUNGRY-42)" class="thumb-input code-input" maxlength="14" uppercase>
+                <input type="text" id="roomCodeInput" placeholder="ROOM CODE (e.g. HUNGRY-42)" class="thumb-input code-input" maxlength="14">
               </div>
               <button id="btnJoinRoom" class="thumb-btn primary">
                 <span class="btn-text">Hop In Circle 🚀</span>
-                <span class="btn-subtext">Join your group's live swipe deck</span>
+                <span class="btn-subtext">Join live group voting</span>
               </button>
             </div>
 
@@ -140,16 +154,20 @@
               <!-- Live avatar bubbles rendered dynamically -->
             </div>
 
+            <button id="btnOpenAddChoiceTop" class="pill-btn mini primary-tint" title="Add Choice">
+              ➕ Add Choice
+            </button>
+
             <button id="btnToggleDetails" class="pill-btn mini" title="Scoreboard">
-              📊 Live Scores
+              📊 Scores
             </button>
           </div>
 
           <!-- Consensus Meter -->
           <div class="consensus-meter-container">
             <div class="meter-meta">
-              <span id="consensusLabel">Consensus: Searching common ground...</span>
-              <span id="cardsLeftLabel">3 left</span>
+              <span id="consensusLabel">Consensus: Swiping in progress...</span>
+              <span id="cardsLeftLabel">0 left</span>
             </div>
             <div class="meter-track">
               <div id="consensusFill" class="meter-fill" style="width: 0%;"></div>
@@ -194,25 +212,25 @@
 
             <!-- Ergonomic Quick Utility Bar (1-Thumb Reachable) -->
             <div class="thumb-utility-dock">
+              <!-- User Input: Add custom decision -->
+              <button id="btnOpenAddChoice" class="utility-pill highlight" title="Add your custom decision">
+                <span>➕ Add Choice</span>
+              </button>
+
               <!-- Left/Right Handed Thumb Toggle -->
               <button id="btnHandToggle" class="utility-pill" title="Toggle Left/Right Thumb mode">
                 <span id="handIcon">👉</span>
-                <span id="handText">Right Thumb</span>
+                <span id="handText">Right</span>
               </button>
 
               <!-- Thumb Zone Diagnostic Overlay Toggle -->
               <button id="btnOverlayToggle" class="utility-pill" title="Show Thumb Reach Zone Overlay">
-                <span>📐 Zone Check</span>
-              </button>
-
-              <!-- Sound Toggle -->
-              <button id="btnSoundToggle" class="utility-pill" title="Sound feedback">
-                <span id="soundIcon">🔊</span>
+                <span>📐 Zone</span>
               </button>
 
               <!-- Force Resolve (If someone fell asleep) -->
               <button id="btnForceResolve" class="utility-pill warning" title="Lock in top choice now">
-                <span>⚡ Reveal Winner</span>
+                <span>⚡ Reveal</span>
               </button>
             </div>
 
@@ -220,7 +238,46 @@
 
         </div>
 
-        <!-- SLIDE-UP THUMB DRAWER: LIVE SCOREBOARD & VETO ALARMS -->
+        <!-- SLIDE-UP THUMB DRAWER 1: ADD CUSTOM DECISION -->
+        <div id="drawerAddChoice" class="thumb-drawer">
+          <div class="drawer-handle" id="drawerAddHandle"></div>
+          <div class="drawer-header">
+            <h3>➕ Add Your Choice to Deck</h3>
+            <button id="btnCloseAddChoice" class="pill-btn mini">Close</button>
+          </div>
+          <div class="drawer-body">
+            <div class="custom-input-group">
+              <label class="input-label">What do you want to suggest?</label>
+              <input type="text" id="customChoiceName" placeholder="e.g. Goodluck Cafe Mutton Kheema" class="thumb-input" maxlength="32">
+            </div>
+
+            <div class="custom-input-group">
+              <label class="input-label">Short Description / Why (Optional)</label>
+              <input type="text" id="customChoiceDesc" placeholder="e.g. Bun maska and hot irani chai" class="thumb-input" maxlength="45">
+            </div>
+
+            <div class="custom-input-group">
+              <label class="input-label">Pick an Emoji Icon</label>
+              <div class="icon-selector-row" id="customIconSelector">
+                <button type="button" class="icon-chip active" data-icon="🍔">🍔</button>
+                <button type="button" class="icon-chip" data-icon="🍕">🍕</button>
+                <button type="button" class="icon-chip" data-icon="🍜">🍜</button>
+                <button type="button" class="icon-chip" data-icon="☕">☕</button>
+                <button type="button" class="icon-chip" data-icon="🍦">🍦</button>
+                <button type="button" class="icon-chip" data-icon="🚗">🚗</button>
+                <button type="button" class="icon-chip" data-icon="🍿">🍿</button>
+                <button type="button" class="icon-chip" data-icon="✨">✨</button>
+              </div>
+            </div>
+
+            <button id="btnSubmitCustomChoice" class="thumb-btn primary">
+              <span class="btn-text">Add to Group Deck 🚀</span>
+              <span class="btn-subtext">Pushes instantly to everyone's phone</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SLIDE-UP THUMB DRAWER 2: LIVE SCOREBOARD & VETO ALARMS -->
         <div id="bottomDrawer" class="thumb-drawer">
           <div class="drawer-handle" id="drawerHandle"></div>
           <div class="drawer-header">
@@ -237,6 +294,13 @@
               <ul id="activityFeedList" class="activity-list">
                 <!-- Live actions -->
               </ul>
+            </div>
+
+            <!-- Explicit Exit Button with Confirmation -->
+            <div class="drawer-exit-box">
+              <button id="btnLeaveRoom" class="pill-btn danger-outline">
+                🚪 Leave Circle (Exit)
+              </button>
             </div>
           </div>
         </div>
@@ -309,7 +373,7 @@
         <div class="desktop-qr-container">
           <div class="qr-placeholder" id="desktopQrBox">
             <div class="qr-icon">📱</div>
-            <div class="qr-text">Scan or Share Code:</div>
+            <div class="qr-text">Room Code:</div>
             <div class="qr-code-highlight" id="desktopCodeDisplay">HUNGRY-00</div>
           </div>
           <div class="invite-link-box">

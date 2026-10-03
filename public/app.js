@@ -4,6 +4,7 @@
 class DeadlockApp {
   constructor() {
     this.state = {
+      screen: 'onboarding',
       room: null,
       user: null,
       consensus: null,
@@ -13,6 +14,7 @@ class DeadlockApp {
       overlayVisible: false,
       selectedAvatar: '😎',
       selectedCategory: 'food',
+      selectedCustomIcon: '🍔',
       sseSource: null
     };
 
@@ -32,7 +34,9 @@ class DeadlockApp {
     this.bindDOM();
     this.bindEvents();
     this.bindKeyboard();
+    this.loadSavedUser();
     this.checkUrlForRoom();
+    this.setupHistoryGuard();
   }
 
   bindDOM() {
@@ -41,8 +45,10 @@ class DeadlockApp {
     this.screenVoting = document.getElementById('screenVoting');
     this.screenWinner = document.getElementById('screenWinner');
 
-    // Onboarding Elements
+    // Onboarding & Auth Elements
     this.userNameInput = document.getElementById('userNameInput');
+    this.userPinInput = document.getElementById('userPinInput');
+    this.authStatusText = document.getElementById('authStatusText');
     this.roomCodeInput = document.getElementById('roomCodeInput');
     this.tabCreateRoom = document.getElementById('tabCreateRoom');
     this.tabJoinRoom = document.getElementById('tabJoinRoom');
@@ -61,26 +67,36 @@ class DeadlockApp {
     this.cardsLeftLabel = document.getElementById('cardsLeftLabel');
     this.consensusFill = document.getElementById('consensusFill');
     this.cardDeckContainer = document.getElementById('cardDeckContainer');
+    this.btnOpenAddChoiceTop = document.getElementById('btnOpenAddChoiceTop');
 
     // Thumb Deck Buttons
     this.btnVeto = document.getElementById('btnVeto');
     this.btnMeh = document.getElementById('btnMeh');
     this.btnYes = document.getElementById('btnYes');
+    this.btnOpenAddChoice = document.getElementById('btnOpenAddChoice');
     this.btnHandToggle = document.getElementById('btnHandToggle');
     this.handIcon = document.getElementById('handIcon');
     this.handText = document.getElementById('handText');
     this.btnOverlayToggle = document.getElementById('btnOverlayToggle');
-    this.btnSoundToggle = document.getElementById('btnSoundToggle');
-    this.soundIcon = document.getElementById('soundIcon');
     this.btnForceResolve = document.getElementById('btnForceResolve');
 
-    // Drawer Elements
+    // Add Choice Drawer
+    this.drawerAddChoice = document.getElementById('drawerAddChoice');
+    this.drawerAddHandle = document.getElementById('drawerAddHandle');
+    this.btnCloseAddChoice = document.getElementById('btnCloseAddChoice');
+    this.customChoiceName = document.getElementById('customChoiceName');
+    this.customChoiceDesc = document.getElementById('customChoiceDesc');
+    this.customIconSelector = document.getElementById('customIconSelector');
+    this.btnSubmitCustomChoice = document.getElementById('btnSubmitCustomChoice');
+
+    // Scores Drawer Elements
     this.bottomDrawer = document.getElementById('bottomDrawer');
     this.drawerHandle = document.getElementById('drawerHandle');
     this.btnToggleDetails = document.getElementById('btnToggleDetails');
     this.btnCloseDrawer = document.getElementById('btnCloseDrawer');
     this.scoreboardList = document.getElementById('scoreboardList');
     this.activityFeedList = document.getElementById('activityFeedList');
+    this.btnLeaveRoom = document.getElementById('btnLeaveRoom');
 
     // Winner Elements
     this.winnerIcon = document.getElementById('winnerIcon');
@@ -99,6 +115,9 @@ class DeadlockApp {
     this.btnDesktopCopy = document.getElementById('btnDesktopCopy');
     this.desktopScoreboard = document.getElementById('desktopScoreboard');
     this.desktopThemeBtn = document.getElementById('desktopThemeBtn');
+    this.desktopUserPill = document.getElementById('desktopUserPill');
+    this.desktopUserAvatar = document.getElementById('desktopUserAvatar');
+    this.desktopUserName = document.getElementById('desktopUserName');
 
     // Overlays & Toast
     this.thumbErgoOverlay = document.getElementById('thumbErgoOverlay');
@@ -114,6 +133,16 @@ class DeadlockApp {
       this.avatarCarousel.querySelectorAll('.avatar-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       this.state.selectedAvatar = chip.dataset.avatar;
+      window.soundFX?.tick(520);
+    });
+
+    // Custom Icon selection
+    this.customIconSelector.addEventListener('click', (e) => {
+      const chip = e.target.closest('.icon-chip');
+      if (!chip) return;
+      this.customIconSelector.querySelectorAll('.icon-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      this.state.selectedCustomIcon = chip.dataset.icon;
       window.soundFX?.tick(520);
     });
 
@@ -146,22 +175,29 @@ class DeadlockApp {
     this.btnMeh.addEventListener('click', () => this.castVoteWithAnimation('meh'));
     this.btnYes.addEventListener('click', () => this.castVoteWithAnimation('yes'));
 
-    // Left/Right Hand Toggle (Constraint #1 ergonomic feature)
+    // Custom Choice Drawer
+    this.btnOpenAddChoice.addEventListener('click', () => this.toggleAddChoiceDrawer(true));
+    this.btnOpenAddChoiceTop.addEventListener('click', () => this.toggleAddChoiceDrawer(true));
+    this.btnCloseAddChoice.addEventListener('click', () => this.toggleAddChoiceDrawer(false));
+    this.drawerAddHandle.addEventListener('click', () => this.toggleAddChoiceDrawer(false));
+    this.btnSubmitCustomChoice.addEventListener('click', () => this.handleSubmitCustomChoice());
+
+    // Left/Right Hand Toggle
     this.btnHandToggle.addEventListener('click', () => this.toggleHandMode());
 
     // Thumb Zone Overlay Toggle
     this.btnOverlayToggle.addEventListener('click', () => this.toggleOverlay());
 
-    // Sound Toggle
-    this.btnSoundToggle.addEventListener('click', () => this.toggleSound());
-
     // Force Resolve
     this.btnForceResolve.addEventListener('click', () => this.forceResolve());
 
-    // Drawer Toggles
+    // Scoreboard Drawer Toggles
     this.btnToggleDetails.addEventListener('click', () => this.toggleDrawer(true));
     this.btnCloseDrawer.addEventListener('click', () => this.toggleDrawer(false));
     this.drawerHandle.addEventListener('click', () => this.toggleDrawer(false));
+
+    // Leave Circle (Explicit Exit)
+    this.btnLeaveRoom.addEventListener('click', () => this.confirmLeaveRoom());
 
     // Winner Actions
     this.btnShareWinner.addEventListener('click', () => this.shareToWhatsApp());
@@ -177,7 +213,6 @@ class DeadlockApp {
   }
 
   bindKeyboard() {
-    // Keyboard shortcuts for Desktop / Laptop view
     window.addEventListener('keydown', (e) => {
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
 
@@ -197,6 +232,53 @@ class DeadlockApp {
     });
   }
 
+  // --- PREVENT ACCIDENTAL BACK NAVIGATION ONCE SWIPING STARTS ---
+  setupHistoryGuard() {
+    window.addEventListener('popstate', (e) => {
+      if (this.state.screen === 'voting') {
+        // Prevent going back to homepage
+        window.history.pushState({ locked: true }, '');
+        this.showToast('🔒 Voting active! Finish swiping or use "Leave Circle" in Scores.');
+        window.soundFX?.voteNo();
+      }
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+      if (this.state.screen === 'voting') {
+        e.preventDefault();
+        e.returnValue = 'Voting is currently active. Do you really want to leave?';
+      }
+    });
+  }
+
+  loadSavedUser() {
+    try {
+      const raw = localStorage.getItem('deadlock_user');
+      if (raw) {
+        const u = JSON.parse(raw);
+        this.state.user = u;
+        this.userNameInput.value = u.username;
+        if (u.pin) this.userPinInput.value = u.pin;
+        this.state.selectedAvatar = u.avatar || '😎';
+
+        this.avatarCarousel.querySelectorAll('.avatar-chip').forEach(chip => {
+          chip.classList.toggle('active', chip.dataset.avatar === this.state.selectedAvatar);
+        });
+
+        this.authStatusText.textContent = `Welcome back, ${u.username}!`;
+        this.updateDesktopUserPill();
+      }
+    } catch (e) {}
+  }
+
+  updateDesktopUserPill() {
+    if (this.state.user && this.desktopUserPill) {
+      this.desktopUserAvatar.textContent = this.state.user.avatar || '😎';
+      this.desktopUserName.textContent = this.state.user.username;
+      this.desktopUserPill.classList.remove('hidden');
+    }
+  }
+
   checkUrlForRoom() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('room');
@@ -206,7 +288,7 @@ class DeadlockApp {
     }
   }
 
-  showToast(msg, duration = 2200) {
+  showToast(msg, duration = 2400) {
     this.toastMessage.textContent = msg;
     this.toastNotification.classList.remove('hidden');
     clearTimeout(this._toastTimer);
@@ -237,15 +319,15 @@ class DeadlockApp {
       document.body.classList.remove('thumb-right-handed');
       document.body.classList.add('thumb-left-handed');
       this.handIcon.textContent = '👈';
-      this.handText.textContent = 'Left Thumb';
-      this.showToast('👈 Swapped to Left-Hand Thumb Arc!');
+      this.handText.textContent = 'Left';
+      this.showToast('👈 Swapped to Left-Thumb Arc!');
     } else {
       this.state.handMode = 'right';
       document.body.classList.remove('thumb-left-handed');
       document.body.classList.add('thumb-right-handed');
       this.handIcon.textContent = '👉';
-      this.handText.textContent = 'Right Thumb';
-      this.showToast('👉 Swapped to Right-Hand Thumb Arc!');
+      this.handText.textContent = 'Right';
+      this.showToast('👉 Swapped to Right-Thumb Arc!');
     }
   }
 
@@ -254,17 +336,10 @@ class DeadlockApp {
     this.state.overlayVisible = !this.state.overlayVisible;
     if (this.state.overlayVisible) {
       this.thumbErgoOverlay.classList.remove('hidden');
-      this.showToast('📐 Green: Natural Thumb Zone | Red: Stretch Zone');
+      this.showToast('📐 Green: Natural Reach | Red: Stretch Zone');
     } else {
       this.thumbErgoOverlay.classList.add('hidden');
     }
-  }
-
-  toggleSound() {
-    this.state.soundEnabled = !this.state.soundEnabled;
-    window.soundFX.enabled = this.state.soundEnabled;
-    this.soundIcon.textContent = this.state.soundEnabled ? '🔊' : '🔇';
-    this.showToast(this.state.soundEnabled ? 'Sound ON 🔊' : 'Sound MUTED 🔇');
   }
 
   toggleDrawer(open) {
@@ -276,29 +351,69 @@ class DeadlockApp {
     }
   }
 
+  toggleAddChoiceDrawer(open) {
+    window.soundFX?.tick(open ? 500 : 350);
+    if (open) {
+      this.drawerAddChoice.classList.add('open');
+      this.customChoiceName.focus();
+    } else {
+      this.drawerAddChoice.classList.remove('open');
+    }
+  }
+
   switchScreen(screenName) {
+    this.state.screen = screenName;
     document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
     if (screenName === 'onboarding') this.screenOnboarding.classList.add('active');
-    if (screenName === 'voting') this.screenVoting.classList.add('active');
+    if (screenName === 'voting') {
+      this.screenVoting.classList.add('active');
+      // Lock into history stack so back button can't exit accidentally
+      window.history.pushState({ locked: true }, '');
+    }
     if (screenName === 'winner') this.screenWinner.classList.add('active');
+  }
+
+  // --- AUTHENTICATION & LOGIN ---
+  async ensureAuthenticated() {
+    const username = this.userNameInput.value.trim();
+    const pin = this.userPinInput.value.trim() || '1234';
+    const avatar = this.state.selectedAvatar || '😎';
+
+    if (!username) {
+      this.userNameInput.focus();
+      throw new Error('Please enter your username');
+    }
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, pin, avatar })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    this.state.user = data.user;
+    localStorage.setItem('deadlock_user', JSON.stringify(data.user));
+    this.updateDesktopUserPill();
+    return data.user;
   }
 
   // --- API CALLS & ROOM CREATION ---
 
   async handleCreateRoom() {
-    const name = this.userNameInput.value.trim() || 'Host';
-    const category = this.state.selectedCategory;
-    const avatar = this.state.selectedAvatar;
-
     window.soundFX?.tick();
 
     try {
       this.btnCreateRoom.disabled = true;
+      const user = await this.ensureAuthenticated();
+      const category = this.state.selectedCategory;
+
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `${name}'s Decision Circle`,
+          title: `${user.username}'s Circle`,
           category
         })
       });
@@ -306,8 +421,8 @@ class DeadlockApp {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
-      // Join the newly created room
-      await this.joinRoomBackend(data.room.id, name, avatar);
+      // Join the newly created room with user ID
+      await this.joinRoomBackend(data.room.id, user);
     } catch (err) {
       this.showToast(`Error: ${err.message}`);
     } finally {
@@ -317,8 +432,6 @@ class DeadlockApp {
 
   async handleJoinRoom() {
     const code = this.roomCodeInput.value.trim().toUpperCase();
-    const name = this.userNameInput.value.trim() || 'Friend';
-    const avatar = this.state.selectedAvatar;
 
     if (!code) {
       this.showToast('Please enter a Room Code');
@@ -330,7 +443,8 @@ class DeadlockApp {
 
     try {
       this.btnJoinRoom.disabled = true;
-      await this.joinRoomBackend(code, name, avatar);
+      const user = await this.ensureAuthenticated();
+      await this.joinRoomBackend(code, user);
     } catch (err) {
       this.showToast(`Failed: ${err.message}`);
     } finally {
@@ -338,11 +452,15 @@ class DeadlockApp {
     }
   }
 
-  async joinRoomBackend(code, name, avatar) {
+  async joinRoomBackend(code, user) {
     const res = await fetch(`/api/rooms/${code}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, avatar })
+      body: JSON.stringify({
+        userId: user.id,
+        name: user.username,
+        avatar: user.avatar
+      })
     });
 
     const data = await res.json();
@@ -352,10 +470,10 @@ class DeadlockApp {
     this.state.user = data.user;
     this.state.currentCardIndex = 0;
 
-    // Connect Server-Sent Events stream
+    // Connect real-time Server-Sent Events stream
     this.connectSSE(data.room.id);
 
-    // Update URL without reload
+    // Update URL query param without full page reload
     const newUrl = `${window.location.pathname}?room=${data.room.id}`;
     window.history.pushState({ room: data.room.id }, '', newUrl);
 
@@ -364,6 +482,49 @@ class DeadlockApp {
     this.showToast(`Joined Circle ${data.room.id}! ⚡`);
   }
 
+  // --- USER INPUT: ADD DECISIONS ON THE FLY ---
+  async handleSubmitCustomChoice() {
+    const name = this.customChoiceName.value.trim();
+    const desc = this.customChoiceDesc.value.trim();
+    const icon = this.state.selectedCustomIcon || '🍔';
+
+    if (!name) {
+      this.showToast('Please enter a choice name');
+      this.customChoiceName.focus();
+      return;
+    }
+
+    window.soundFX?.tick();
+
+    try {
+      this.btnSubmitCustomChoice.disabled = true;
+      const res = await fetch(`/api/rooms/${this.state.room.id}/options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: this.state.user.id,
+          name,
+          desc,
+          icon,
+          tag: 'Friend Pick'
+        })
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      this.customChoiceName.value = '';
+      this.customChoiceDesc.value = '';
+      this.toggleAddChoiceDrawer(false);
+      this.showToast(`Added "${name}" to the deck! 🎯`);
+    } catch (err) {
+      this.showToast(`Error: ${err.message}`);
+    } finally {
+      this.btnSubmitCustomChoice.disabled = false;
+    }
+  }
+
+  // --- REAL-TIME SIMULTANEOUS MULTI-USER SYNC (SSE) ---
   connectSSE(code) {
     if (this.state.sseSource) {
       this.state.sseSource.close();
@@ -381,7 +542,7 @@ class DeadlockApp {
     };
 
     this.state.sseSource.onerror = (err) => {
-      console.warn('SSE connection issue, reconnecting automatically...', err);
+      console.warn('SSE stream reconnecting...', err);
     };
   }
 
@@ -389,18 +550,29 @@ class DeadlockApp {
     if (payload.type === 'INIT') {
       this.state.room = payload.room;
       this.state.consensus = payload.consensus;
-      this.renderRoomState();
+      this.renderParticipants();
+      this.renderCards();
+      this.renderConsensusProgress();
+      this.renderScoreboards();
     } else if (payload.type === 'PARTICIPANT_JOINED') {
       this.state.room = payload.room;
       this.renderParticipants();
-      this.showToast(`${payload.user.name} joined! 👋`);
+      window.soundFX?.tick(620);
+      this.showToast(`${payload.user.name} hopped in! 👋`);
+    } else if (payload.type === 'OPTION_ADDED') {
+      this.state.room = payload.room;
+      this.state.consensus = payload.consensus;
+      this.renderCards();
+      this.renderScoreboards();
+      window.soundFX?.tick(580);
+      this.showToast(`New choice added: "${payload.newOption.name}"! ✨`);
     } else if (payload.type === 'VOTE_CAST') {
       this.state.room = payload.room;
       this.state.consensus = payload.consensus;
       this.renderConsensusProgress();
       this.renderScoreboards();
 
-      // If room decided, trigger celebrate
+      // If room decided, trigger celebration simultaneously for both users
       if (this.state.room.status === 'decided' && this.state.room.winner) {
         this.triggerWinner(this.state.room.winner);
       }
@@ -508,10 +680,18 @@ class DeadlockApp {
         <div class="emoji">⏳</div>
         <h3>You've Swiped All Options!</h3>
         <p class="text-muted" style="font-size: 0.85rem; margin-top: 6px;">
-          Waiting for friends to finish swiping with their thumbs...
+          Waiting for your friend to finish swiping with their thumb...
         </p>
+        <button id="btnEmptyAddChoice" class="pill-btn mini primary-tint" style="margin-top: 14px;">
+          ➕ Add Another Choice
+        </button>
       </div>
     `;
+
+    const btn = document.getElementById('btnEmptyAddChoice');
+    if (btn) {
+      btn.addEventListener('click', () => this.toggleAddChoiceDrawer(true));
+    }
   }
 
   // --- TACTILE ONE-THUMB TOUCH & POINTER SWIPE ENGINE ---
@@ -672,14 +852,13 @@ class DeadlockApp {
       return;
     }
 
-    // Progress percentage towards unanimous lock
     const yesRatio = (top.yesCount / totalUsers);
     const progress = Math.min(100, Math.round(yesRatio * 100));
 
     this.consensusFill.style.width = `${progress}%`;
 
     if (top.isVetoed) {
-      this.consensusLabel.innerHTML = `⚠️ Top pick <span style="color:#ef4444;">vetoed</span>. Looking for backup...`;
+      this.consensusLabel.innerHTML = `⚠️ Leading pick was <span style="color:#ef4444;">vetoed</span>. Looking for backup...`;
     } else if (progress === 100 && totalUsers >= 2) {
       this.consensusLabel.innerHTML = `🔥 <span style="color:#10b981; font-weight:800;">UNANIMOUS CONSENSUS!</span>`;
     } else {
@@ -713,7 +892,6 @@ class DeadlockApp {
       this.desktopScoreboard.innerHTML = html;
     }
 
-    // Activity Stream
     if (this.state.room && this.state.room.activity) {
       this.activityFeedList.innerHTML = this.state.room.activity.slice(0, 10).map(act => `
         <li>${act.text}</li>
@@ -746,6 +924,27 @@ class DeadlockApp {
     }
   }
 
+  confirmLeaveRoom() {
+    const ok = window.confirm('Are you sure you want to leave this voting round?');
+    if (ok) {
+      this.leaveRoom();
+    }
+  }
+
+  leaveRoom() {
+    if (this.state.sseSource) {
+      this.state.sseSource.close();
+      this.state.sseSource = null;
+    }
+    this.state.room = null;
+    this.state.consensus = null;
+    this.toggleDrawer(false);
+    this.switchScreen('onboarding');
+    // Clear room query param
+    window.history.pushState({}, '', window.location.pathname);
+    this.showToast('Left circle');
+  }
+
   triggerWinner(winner) {
     window.soundFX?.celebrate();
     this.launchConfetti();
@@ -756,7 +955,6 @@ class DeadlockApp {
     this.winnerBudget.textContent = winner.budget;
     this.winnerDesc.textContent = winner.desc;
 
-    // Search link for instant Google Maps / Zomato directions
     const query = encodeURIComponent(`${winner.name} near me`);
     this.btnNavigateWinner.href = `https://www.google.com/maps/search/?api=1&query=${query}`;
 
@@ -793,7 +991,6 @@ class DeadlockApp {
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   }
 
-  // Celebratory Confetti Burst Canvas
   launchConfetti() {
     const canvas = document.getElementById('confettiCanvas');
     if (!canvas) return;
@@ -825,7 +1022,7 @@ class DeadlockApp {
       particles.forEach(p => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.4; // gravity
+        p.vy += 0.4;
         p.rotation += p.rSpeed;
 
         ctx.save();

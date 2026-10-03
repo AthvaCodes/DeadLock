@@ -20,6 +20,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// User Login or Register (Persistent Server Auth)
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, pin, avatar } = req.body;
+    const user = store.loginOrRegister({ username, pin, avatar });
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // Create Room
 app.post('/api/rooms', (req, res) => {
   try {
@@ -48,17 +59,28 @@ app.get('/api/rooms/:code', (req, res) => {
 // Join Room
 app.post('/api/rooms/:code/join', (req, res) => {
   try {
-    const { name, avatar } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, error: 'Name is required' });
-    }
-    const result = store.joinRoom(req.params.code, { name: name.trim(), avatar });
+    const { userId, name, avatar } = req.body;
+    const result = store.joinRoom(req.params.code, { userId, name, avatar });
     if (!result) {
       return res.status(404).json({ success: false, error: 'Room not found' });
     }
     res.json({ success: true, room: result.room, user: result.user });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// User Input: Add New Decision/Choice to Room
+app.post('/api/rooms/:code/options', (req, res) => {
+  try {
+    const { userId, name, desc, tag, icon, budget } = req.body;
+    const result = store.addOption(req.params.code, { userId, name, desc, tag, icon, budget });
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+    res.status(201).json({ success: true, room: result.room, newOption: result.newOption, consensus: result.consensus });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 

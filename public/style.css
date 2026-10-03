@@ -307,6 +307,40 @@ body {
   margin-bottom: 0.85rem;
 }
 
+.auth-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.auth-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent-yellow);
+}
+
+.auth-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.login-inputs-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.user-input {
+  flex: 1.4;
+}
+
+.pin-input {
+  flex: 0.9;
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  text-align: center;
+}
+
 .avatar-carousel {
   display: flex;
   gap: 0.5rem;
@@ -1266,3 +1300,106 @@ body.thumb-left-handed .thumb-utility-dock {
     color: var(--text-muted);
   }
 }
+
+/* User Pill in Desktop Header */
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.user-pill.hidden {
+  display: none;
+}
+
+/* Primary Tint Pill */
+.pill-btn.primary-tint {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: var(--accent-yellow);
+  font-weight: 700;
+}
+
+/* Highlight Utility Pill */
+.utility-pill.highlight {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.55);
+  color: #c7d2fe;
+}
+
+/* Custom Choice Form (Inside Drawer) */
+.custom-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.input-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.icon-selector-row {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 4px 2px;
+  scrollbar-width: none;
+}
+.icon-selector-row::-webkit-scrollbar {
+  display: none;
+}
+
+.icon-chip {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 2px solid transparent;
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-chip:active {
+  transform: scale(0.9);
+}
+
+.icon-chip.active {
+  border-color: var(--accent-yellow);
+  background: rgba(251, 191, 36, 0.2);
+  transform: scale(1.05);
+}
+
+/* Drawer Exit Box */
+.drawer-exit-box {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-subtle);
+  display: flex;
+  justify-content: center;
+}
+
+.pill-btn.danger-outline {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  padding: 8px 18px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.pill-btn.danger-outline:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
