@@ -51,6 +51,17 @@ body.light-theme {
   user-select: none;
 }
 
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent-yellow);
+  outline-offset: 3px;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -1162,7 +1173,7 @@ body.thumb-left-handed .thumb-utility-dock {
 }
 
 /* =========================================================
-   DESKTOP / LAPTOP DISPLAY MODE (Width >= 900px)
+   DESKTOP / LAPTOP DISPLAY MODE (Width >= 1100px)
    The app transforms into a dual-view:
    - Left: The 1-Thumb phone simulator
    - Right: The "Living Room / TV War-Room Dashboard"
@@ -1171,7 +1182,7 @@ body.thumb-left-handed .thumb-utility-dock {
   display: none;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1100px) {
   .desktop-banner {
     display: flex;
   }
@@ -1300,6 +1311,59 @@ body.thumb-left-handed .thumb-utility-dock {
     flex-direction: column;
     gap: 0.35rem;
     color: var(--text-muted);
+  }
+}
+
+/* Give tablets and compact laptop windows room without squeezing the dashboard. */
+@media (min-width: 600px) and (max-width: 1099px) {
+  .main-container {
+    max-width: 560px;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1099px) {
+  .desktop-banner {
+    display: flex;
+  }
+
+  .app-layout {
+    height: calc(100dvh - 72px);
+  }
+}
+
+/* Keep controls comfortable on narrow phones and short landscape screens. */
+@media (max-width: 380px) {
+  .screen-view-zone {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .screen-thumb-zone {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .pill-btn {
+    min-width: 0;
+    font-size: 0.72rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+
+@media (max-height: 620px) {
+  :root {
+    --thumb-zone-height: 36%;
+  }
+
+  .screen-view-zone {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .screen-thumb-zone {
+    padding-top: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 }
 
