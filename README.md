@@ -1,50 +1,37 @@
 # Deadlock
 
-### Stop saying “kuch bhi chalega.” Start deciding.
+## The Annoyance
+Friends often spend more time deciding where to eat or hang out than actually going there. Everyone says “kuch bhi chalega” but rejects every suggestion. This happens regularly in my friend group.
 
-Deadlock is a real-time group decision-making app that helps friends quickly decide where to eat or hang out.
+## The Constraint
+**One Thumb:** The app had to be fully usable with one hand. I designed it with thumb-friendly buttons, swipe actions, and left/right hand modes.
 
-## Features
+## The Great Part
+**Swipe Voting:** Users can quickly swipe through options and vote instead of spending time arguing or typing.
 
-- Swipe-based voting
-- Real-time multiplayer rooms
-- **Yes / No / Veto (-3 pts)**
-- Unanimous consensus detection
-- Confetti when everyone agrees
-- Add custom choices
-- One-tap Google Maps navigation
-- Thumb-friendly mobile UI
-- Left/right hand mode
-- Clear Leave and Back navigation
-- Zone Check for thumb reach
+## The Two Testers
+- **Tester 1:** Was confused about some controls → I made the actions clearer.
+- **Tester 2:** Had difficulty reaching some controls → I moved important controls lower and added hand modes.
 
-## Tech Stack
+## AI
+I used AI for UI ideas, swipe logic, and debugging. One generated swipe implementation conflicted with my existing UI state, so I modified it manually.
 
-- HTML, CSS, JavaScript
-- Node.js + Express
-- Server-Sent Events (SSE)
-- Supabase
-- Google Maps
+## Not Done
+- Google Places autocomplete is not implemented yet.
+- Some Maps functionality is still basic.
 
-## UX Focus
+## Run It
 
-The UI was designed around real user testing:
+```bash
+git clone https://github.com/AthvaCodes/DeadLock.git
+cd DeadLock
+npm install
+npm start
+```
 
-- Important controls stay in the bottom 45% for easier thumb reach.
-- Live scores were moved down for one-handed users.
-- Left/right controls were added for left-handed users.
-
-## AI Usage
-
-AI was used for:
-
-- Swipe/drag interaction logic
-- Express SSE boilerplate
-
-
-## Current Limitations
-
-- Live Google Places autocomplete is not implemented yet.
-- Google Maps currently opens through a direct search link.
-- iOS native vibration is unavailable, so Web Audio clicks are used instead.
-
+##Environment Variables
+```
+PORT=
+NODE_ENV=
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
